@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>e53e3411-13d3-4207-b4f6-cf3aac2722a8</UserSecretsId>
+  </PropertyGroup>
+
+   <ItemGroup>
+   <!-- Certifique-se que a linha do Novell LDAP está aqui -->
+   <!--PackageReference Include="Novell.Directory.Ldap.NETStandard" Version="3.6.0" -->
+   <PackageReference Include="System.DirectoryServices.Protocols" Version="8.0.0" />
+   <!-- ***** GARANTA QUE ESTA LINHA DO POWERSHELL TAMBÉM ESTÁ AQUI e DESCOMENTADA ***** -->
+   <PackageReference Include="Microsoft.PowerShell.SDK" Version="7.4.2" />
+   <!-- (Use 7.4.2 ou a versão estável mais recente que você decidiu usar) -->
+
+ </ItemGroup>
+</Project>

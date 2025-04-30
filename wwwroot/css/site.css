@@ -1,0 +1,150 @@
+/* site.css - Estilos Personalizados v3 */
+
+/* Layout base para o body */
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #f8f9fa;
+  color: #212529;
+}
+
+/* Estilo para o main content */
+main {
+  flex-grow: 1;
+}
+
+
+/* --- Layout Específico para a Página de Login --- */
+.login-page-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.login-sidebar {
+  flex: 0 0 350px;
+  min-width: 300px;
+  background-color: #212529;
+  color: #f8f9fa;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 30px;
+}
+
+/* --- CORREÇÃO AQUI: Regra Principal para o Background da Direita --- */
+.login-main-background {
+  flex-grow: 1; /* Ocupa o espaço restante */
+
+  /* Define a IMAGEM como fundo padrão */
+  background-image: url('../images/background_gtop.JPG'); /* <= Use caminho absoluto e verifique nome */
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+
+  /* Estilos adicionais (se precisar de conteúdo sobre a imagem) */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: white; /* Para texto sobreposto, se houver */
+}
+
+
+/* Para telas menores, ajusta a sidebar e esconde o fundo da imagem */
+@media (max-width: 767.98px) {
+  .login-sidebar {
+      flex: 0 0 100%;
+      min-width: auto;
+      height: auto;
+      justify-content: flex-start;
+  }
+  .login-main-background {
+      display: none; /* Esconde a div inteira com a imagem em telas pequenas */
+  }
+}
+/* --- FIM DA CORREÇÃO DO BACKGROUND --- */
+
+
+.login-form-box {
+   width: 100%;
+   max-width: 300px;
+   margin: auto;
+}
+
+/* Estilos dos inputs e botões do login (sem alterações) */
+.login-form-box .form-control {
+  background-color: #343a40;
+  color: #f8f9fa;
+  border-color: #495057;
+}
+.login-form-box .form-control::placeholder {
+  color: #ced4da;
+  opacity: 1;
+}
+.login-form-box .form-control:focus {
+  background-color: #343a40;
+  color: #f8f9fa;
+  border-color: #007bff;
+  box-shadow: 0 0 0 0.25rem rgba(0, 123, 255, 0.25);
+}
+.login-form-box .btn-primary {
+  background-color: #007bff;
+  border-color: #007bff;
+}
+.login-form-box .btn-primary:hover {
+   background-color: #0056b3;
+   border-color: #004085;
+}
+.login-form-box a {
+  color: #ced4da;
+  text-decoration: none;
+}
+.login-form-box a:hover {
+   color: #f8f9fa;
+   text-decoration: underline;
+}
+
+
+/* --- Estilo Reutilizável para Caixas de Conteúdo Escuras (sem alterações) --- */
+.dark-content-box {
+  background-color: #212529;
+  color: #f8f9fa;
+  padding: 30px;
+  border-radius: 8px;
+}
+.dark-content-box .form-control,
+.dark-content-box .form-select {
+   background-color: #343a40;
+   color: #f8f9fa;
+   border-color: #495057;
+}
+.dark-content-box .form-control::placeholder {
+   color: #ced4da;
+   opacity: 1;
+}
+.dark-content-box .form-control:focus,
+.dark-content-box .form-select:focus {
+   background-color: #343a40;
+   color: #f8f9fa;
+   border-color: #007bff;
+   box-shadow: 0 0 0 0.25rem rgba(0, 123, 255, 0.25);
+}
+.dark-content-box hr {
+  border-top-color: #495057;
+}
+
+/* --- Estilos para o Footer (sem alterações) --- */
+.footer {
+  width: 100%;
+  text-align: center;
+  padding: 15px 0;
+  margin-top: auto;
+  background-color: #f8f9fa;
+  color: #212529;
+  flex-shrink: 0;
+}

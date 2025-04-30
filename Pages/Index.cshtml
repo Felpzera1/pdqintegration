@@ -1,0 +1,120 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Deploy PDQ"; // Usa o _Layout.cshtml padrão (não-login)
+}
+
+@Html.AntiForgeryToken() @* Para segurança AJAX *@
+
+@* Layout de duas colunas usando Grid Bootstrap *@
+<div class="row mt-4 g-3"> @* Margem top e espaçamento entre colunas *@
+
+    @* --- Coluna Esquerda: Formulário --- *@
+    <div class="col-lg-5"> @* Tamanho da coluna *@
+        <div class="dark-content-box h-100"> @* Caixa escura com altura total *@
+
+            <div class="mb-4">
+                <h1 class="display-6">Deployment PDQ</h1>
+                <p>Interface para execução de deploys via PDQ Deploy.</p>
+            </div>
+
+            <h3>Realizar Deploy</h3>
+            <hr />
+
+            <div asp-validation-summary="ModelOnly" class="text-danger mb-3" role="alert"></div>
+             @if (ViewData["ErrorMessage"] != null) { <div class="alert alert-danger mb-3" role="alert">@ViewData["ErrorMessage"]</div> }
+             @if (ViewData["WarningMessage"] != null) { <div class="alert alert-warning mb-3" role="alert">@ViewData["WarningMessage"]</div> }
+
+            <form id="deployForm" method="post">
+                <div class="mb-3">
+                    <label asp-for="Hostname" class="form-label"></label>
+                    <input asp-for="Hostname" id="hostnameInput" class="form-control" placeholder="Ex: SERVER01 ou 192.168.1.100" />
+                    <span asp-validation-for="Hostname" class="text-danger"></span>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="SelectedPackage" class="form-label"></label>
+                    @if (Model.PackageOptions != null && Model.PackageOptions.Any())
+                    {
+                        <select asp-for="SelectedPackage" id="packageSelect" class="form-select" asp-items="Model.PackageOptions">
+                            <option value="">-- Selecione um Pacote --</option>
+                        </select>
+                    }
+                    else
+                    {
+                        <select id="packageSelect" class="form-select" disabled>
+                             <option value="">@((Model.PackageOptions == null) ? "Erro ao carregar" : "Nenhum pacote")</option>
+                         </select>
+                         <small class="text-warning">Lista de pacotes indisponível.</small>
+                    }
+                    <span asp-validation-for="SelectedPackage" class="text-danger"></span>
+                </div>
+                <div class="d-grid gap-2 mt-4">
+                    <button type="button" id="deployButton" class="btn btn-success btn-lg">
+                        <span id="deployButtonText">Realizar Deploy</span>
+                        <span id="deploySpinner" class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+                    </button>
+                </div>
+            </form>
+        </div> @* Fim .dark-content-box *@
+    </div> @* Fim col-lg-5 *@
+
+
+    @* --- Coluna Direita: Logs --- *@
+    <div class="col-lg-7"> @* Tamanho da coluna *@
+        <div class="dark-content-box h-100 d-flex flex-column"> @* Caixa escura, altura e flex *@
+            <div class="mb-4">
+                 <h1 class="display-6">Logs do Deploy</h1>
+                 <p>Acompanhe o status e os resultados.</p>
+             </div>
+            <h3>Logs</h3>
+            <hr />
+             @* Container para o Log com scroll *@
+             <div id="logOutputContainer" class="flex-grow-1" style="overflow-y: auto; background-color: #111; border: 1px solid #444; padding: 15px; border-radius: 4px;">
+                <pre id="logOutput" style="white-space: pre-wrap; word-wrap: break-word; margin: 0; color: #ccc; font-family: Consolas, 'Courier New', monospace; font-size: 0.85em;">Aguardando execução...</pre>
+             </div>
+         </div> @* Fim .dark-content-box *@
+    </div> @* Fim col-lg-7 *@
+
+</div> @* Fim row *@
+
+
+@* Seção de Scripts *@
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const deployButton = document.getElementById('deployButton');
+            const deployButtonText = document.getElementById('deployButtonText');
+            const hostnameInput = document.getElementById('hostnameInput');
+            const packageSelect = document.getElementById('packageSelect');
+            const logOutput = document.getElementById('logOutput');
+            const logContainer = document.getElementById('logOutputContainer');
+            const spinner = document.getElementById('deploySpinner');
+            const antiForgeryToken = document.querySelector('input[name="__RequestVerificationToken"]').value;
+
+            deployButton.addEventListener('click', function () {
+                const hostname = hostnameInput.value.trim();
+                const selectedPackage = packageSelect.value;
+                if (!hostname || !selectedPackage) { alert('Hostname e Pacote são obrigatórios.'); return; }
+
+                logOutput.textContent = `[${_getCurrentTime()}] Iniciando para '${hostname}' com pacote '${selectedPackage}'...\n---------------------------------------\n`;
+                logContainer.style.borderColor = '#444'; _scrollToBottom(logContainer);
+                deployButton.disabled = true; spinner.style.display = 'inline-block'; deployButtonText.textContent = 'Executando...';
+
+                const formData = new FormData(); formData.append('hostname', hostname); formData.append('selectedPackage', selectedPackage);
+
+                 fetch('/Index?handler=Deploy', { method: 'POST', headers: { 'RequestVerificationToken': antiForgeryToken }, body: formData })
+                 .then(response => {
+                    if (!response.ok) { return response.text().then(text => { throw new Error(`Erro Servidor ${response.status}: ${text || 'Detalhe não disponível.'}`); }); }
+                     return response.json();
+                 })
+                 .then(data => { _displayLog(data.log || '[Sem log]', data.success); _scrollToBottom(logContainer); })
+                 .catch(error => { console.error('Erro deploy:', error); _displayLog(`ERRO Comunicação:\n${error.message}`, false); _scrollToBottom(logContainer); })
+                 .finally(() => { deployButton.disabled = false; spinner.style.display = 'none'; deployButtonText.textContent = 'Realizar Deploy'; });
+            });
+            function _displayLog(logText, success) { logOutput.textContent += `\n[${_getCurrentTime()}] Resposta Servidor:\n---------------------------------------\n${logText}\n=======================================\n`; logContainer.style.borderColor = success ? '#198754' : '#dc3545'; }
+            function _scrollToBottom(element) { element.scrollTop = element.scrollHeight; }
+            function _getCurrentTime() { return new Date().toLocaleTimeString('pt-BR'); }
+        });
+    </script>
+}
