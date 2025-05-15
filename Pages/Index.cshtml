@@ -1,34 +1,56 @@
 ﻿@page
 @model IndexModel
 @{
-    ViewData["Title"] = "Deploy PDQ"; // Usa o _Layout.cshtml padrão (não-login)
+    ViewData["Title"] = "Deploy PDQ";
 }
 
-@Html.AntiForgeryToken() @* Para segurança AJAX *@
+@Html.AntiForgeryToken()
 
-@* Layout de duas colunas usando Grid Bootstrap *@
-<div class="row mt-4 g-3"> @* Margem top e espaçamento entre colunas *@
+@* >>> ADICIONAR PARA MENSAGEM DE STATUS DO REFRESH <<< *@
+@if (!string.IsNullOrEmpty(Model.StatusMessagePackages))
+{
+    <div class="alert alert-info alert-dismissible fade show mt-3" role="alert">
+        @Model.StatusMessagePackages
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
 
-    @* --- Coluna Esquerda: Formulário --- *@
-    <div class="col-lg-5"> @* Tamanho da coluna *@
-        <div class="dark-content-box h-100"> @* Caixa escura com altura total *@
+@* Container para informações do usuário e botões de ação no topo *@
+<div class="d-flex justify-content-between align-items-center mt-3 mb-3">
+    <div>
+        @if (User.Identity != null && User.Identity.IsAuthenticated)
+        {
+        }
+    </div>
+    <div>
+        @* >>> ADICIONAR BOTÃO DE ATUALIZAR PACOTES <<< *@
+        <form method="post" asp-page-handler="RefreshPackages" style="display: inline-block; margin-right: 10px;">
+            <button type="submit" class="btn btn-sm btn-outline-secondary">Atualizar Lista de Pacotes</button>
+        </form>
 
-            <div class="mb-4">
-                <h1 class="display-6">Deployment PDQ</h1>
-                <p>Interface para execução de deploys via PDQ Deploy.</p>
+        @* Botão de Logout (verifique se o caminho está correto para sua app Identity) *@
+        @if (User.Identity != null && User.Identity.IsAuthenticated)
+        {
+        }
+    </div>
+</div>
+
+<<div class="row mt-4 g-3">
+    <div class="col-lg-5">
+        <div class="dark-content-box h-100">
+            <div class="mb-4 text-center"> 
+                <img src="~/images/Logotipo_Gtop_Azul.png" alt="Logo PDQ" style="height: 60px; margin-right: 15px; vertical-align: middle;" />
             </div>
-
             <h3>Realizar Deploy</h3>
             <hr />
-
             <div asp-validation-summary="ModelOnly" class="text-danger mb-3" role="alert"></div>
-             @if (ViewData["ErrorMessage"] != null) { <div class="alert alert-danger mb-3" role="alert">@ViewData["ErrorMessage"]</div> }
-             @if (ViewData["WarningMessage"] != null) { <div class="alert alert-warning mb-3" role="alert">@ViewData["WarningMessage"]</div> }
+            @if (ViewData["ErrorMessage"] != null) { <div class="alert alert-danger mb-3" role="alert">@ViewData["ErrorMessage"]</div> }
+            @if (ViewData["WarningMessage"] != null) { <div class="alert alert-warning mb-3" role="alert">@ViewData["WarningMessage"]</div> }
 
             <form id="deployForm" method="post">
                 <div class="mb-3">
                     <label asp-for="Hostname" class="form-label"></label>
-                    <input asp-for="Hostname" id="hostnameInput" class="form-control" placeholder="Ex: SERVER01 ou 192.168.1.100" />
+                    <input asp-for="Hostname" id="hostnameInput" class="form-control" placeholder="Ex.: Hostname ou IP" />
                     <span asp-validation-for="Hostname" class="text-danger"></span>
                 </div>
                 <div class="mb-3">
@@ -55,33 +77,28 @@
                     </button>
                 </div>
             </form>
-        </div> @* Fim .dark-content-box *@
-    </div> @* Fim col-lg-5 *@
+        </div>
+    </div>
 
-
-    @* --- Coluna Direita: Logs --- *@
-    <div class="col-lg-7"> @* Tamanho da coluna *@
-        <div class="dark-content-box h-100 d-flex flex-column"> @* Caixa escura, altura e flex *@
+    <div class="col-lg-7">
+        <div class="dark-content-box h-100 d-flex flex-column">
             <div class="mb-4">
                  <h1 class="display-6">Logs do Deploy</h1>
                  <p>Acompanhe o status e os resultados.</p>
              </div>
             <h3>Logs</h3>
             <hr />
-             @* Container para o Log com scroll *@
              <div id="logOutputContainer" class="flex-grow-1" style="overflow-y: auto; background-color: #111; border: 1px solid #444; padding: 15px; border-radius: 4px;">
                 <pre id="logOutput" style="white-space: pre-wrap; word-wrap: break-word; margin: 0; color: #ccc; font-family: Consolas, 'Courier New', monospace; font-size: 0.85em;">Aguardando execução...</pre>
              </div>
-         </div> @* Fim .dark-content-box *@
-    </div> @* Fim col-lg-7 *@
+         </div>
+    </div>
+</div>
 
-</div> @* Fim row *@
-
-
-@* Seção de Scripts *@
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
     <script>
+        // Seu JavaScript original permanece aqui, sem alterações necessárias para o botão de refresh
         document.addEventListener('DOMContentLoaded', function () {
             const deployButton = document.getElementById('deployButton');
             const deployButtonText = document.getElementById('deployButtonText');

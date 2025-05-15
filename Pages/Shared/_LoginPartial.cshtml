@@ -11,7 +11,7 @@
         <li class="nav-item">
             @* Exibe o nome do usuário. User.Identity.Name pega o valor da ClaimTypes.Name do cookie *@
             @* Na sua aplicação, isso deve ser o UPN ou sAMAccountName que você colocou lá *@
-            <a id="manage" class="nav-link text-dark" asp-area="" asp-page="#" title="Gerenciar">Olá @User.Identity?.Name!</a> @* Link fictício ou para uma página de perfil *@
+            <a id="manage" class="nav-link text-dark" asp-area="" asp-page="#" title="Gerenciar">Usuário: @User.Identity?.Name!</a> @* Link fictício ou para uma página de perfil *@
         </li>
         <li class="nav-item">
             @* Formulário para realizar o Logout via POST *@

@@ -1,6 +1,6 @@
 {
   "Version": 1,
-  "Hash": "PyDeQkiRs6T7W+Mo4Cq/DGurl5CB4DdRIFL+AtU0WLA=",
+  "Hash": "osRC1dFuO8NyUV0T0mOeAVXQBuuhmf226C2GUu8/4+4=",
   "Source": "GtopPdqNet",
   "BasePath": "_content/GtopPdqNet",
   "Mode": "Default",
@@ -74,12 +74,12 @@
       "OriginalItemSpec": "wwwroot\\css\\site.css"
     },
     {
-      "Identity": "C:\\GtopPdqNet\\wwwroot\\favicon.ico",
+      "Identity": "C:\\GtopPdqNet\\wwwroot\\gtop-icon.ico",
       "SourceId": "GtopPdqNet",
       "SourceType": "Discovered",
       "ContentRoot": "C:\\GtopPdqNet\\wwwroot\\",
       "BasePath": "_content/GtopPdqNet",
-      "RelativePath": "favicon.ico",
+      "RelativePath": "gtop-icon.ico",
       "AssetKind": "All",
       "AssetMode": "All",
       "AssetRole": "Primary",
@@ -90,7 +90,7 @@
       "AssetTraitValue": "",
       "CopyToOutputDirectory": "Never",
       "CopyToPublishDirectory": "PreserveNewest",
-      "OriginalItemSpec": "wwwroot\\favicon.ico"
+      "OriginalItemSpec": "wwwroot\\gtop-icon.ico"
     },
     {
       "Identity": "C:\\GtopPdqNet\\wwwroot\\images\\background_gtop.JPG",
@@ -110,6 +110,25 @@
       "CopyToOutputDirectory": "Never",
       "CopyToPublishDirectory": "PreserveNewest",
       "OriginalItemSpec": "wwwroot\\images\\background_gtop.JPG"
+    },
+    {
+      "Identity": "C:\\GtopPdqNet\\wwwroot\\images\\Logotipo_Gtop_Azul.png",
+      "SourceId": "GtopPdqNet",
+      "SourceType": "Discovered",
+      "ContentRoot": "C:\\GtopPdqNet\\wwwroot\\",
+      "BasePath": "_content/GtopPdqNet",
+      "RelativePath": "images/Logotipo_Gtop_Azul.png",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "AssetMergeBehavior": "PreferTarget",
+      "AssetMergeSource": "",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot\\images\\Logotipo_Gtop_Azul.png"
     },
     {
       "Identity": "C:\\GtopPdqNet\\wwwroot\\js\\site.js",

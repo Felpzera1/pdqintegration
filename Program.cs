@@ -14,6 +14,8 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using System.DirectoryServices.Protocols;
 using System.Security.Cryptography.X509Certificates;
+using Microsoft.AspNetCore.DataProtection;
+using System.IO;
 public class LdapSettings
 {
     public string Server { get; set; } = string.Empty;
@@ -112,6 +114,9 @@ public class Program
         builder.Logging.ClearProviders();
         builder.Logging.AddConsole();
         builder.Logging.AddDebug();
+        builder.Services.AddDataProtection()
+        .PersistKeysToFileSystem(new DirectoryInfo("C:\\projetopdq\\keys")) 
+        .SetApplicationName("PdqWebApp"); // Ou outro nome único para sua app
 
         var app = builder.Build();
 

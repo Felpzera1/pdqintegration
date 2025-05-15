@@ -69,6 +69,6 @@ public class ResultadoModel : PageModel
         // Remova se nao quiser esse comportamento
         // TempData.Keep(); 
 
-        return Page(); // Renderiza a pagina Resultado.cshtml
+        return Page(); // Renderiza a pagina Resultado.cshtml...
     }
 }

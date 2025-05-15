@@ -1,15 +1,13 @@
-// Arquivo: Interfaces/IPowerShellService.cs
+// No arquivo IPowerShellService.cs
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace GtopPdqNet.Interfaces // Define o namespace
+namespace GtopPdqNet.Interfaces // Ou o namespace da sua interface
 {
     public interface IPowerShellService
     {
-        // Método para buscar pacotes PDQ (exemplo)
         Task<List<string>> GetPdqPackagesAsync();
-
-        // Método para executar o deploy (retorna sucesso e output)
         Task<(bool success, string output)> ExecutePdqDeployAsync(string hostname, string packageName);
+        Task<List<string>> RefreshPdqPackagesCacheAsync(); // <<< CERTIFIQUE-SE QUE O RETORNO É Task<List<string>>
     }
 }

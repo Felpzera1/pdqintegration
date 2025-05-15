@@ -9,8 +9,12 @@
       "PackagePath": "staticwebassets\\css\\site.css"
     },
     {
-      "Id": "C:\\GtopPdqNet\\wwwroot\\favicon.ico",
-      "PackagePath": "staticwebassets\\favicon.ico"
+      "Id": "C:\\GtopPdqNet\\wwwroot\\gtop-icon.ico",
+      "PackagePath": "staticwebassets\\gtop-icon.ico"
+    },
+    {
+      "Id": "C:\\GtopPdqNet\\wwwroot\\images\\Logotipo_Gtop_Azul.png",
+      "PackagePath": "staticwebassets\\images\\Logotipo_Gtop_Azul.png"
     },
     {
       "Id": "C:\\GtopPdqNet\\wwwroot\\images\\background_gtop.JPG",
