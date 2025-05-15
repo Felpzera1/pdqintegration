@@ -1,4 +1,4 @@
-// Arquivo: Pages/Login.cshtml.cs
+// Arquivo: Pages/Login.cshtml.cs (Modificado)
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using System.ComponentModel.DataAnnotations;
@@ -8,15 +8,21 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
-using GtopPdqNet.Services; // Ou o namespace correto do seu AuthService
+using Microsoft.Extensions.Options; // <<< ADICIONAR PARA IOptions
+using System; // <<< ADICIONAR PARA StringComparer
+using System.Linq; // <<< ADICIONAR PARA .Contains
 
-namespace GtopPdqNet.Pages
+// Substitua GtopPdqNet.Services pelo namespace correto do seu AuthService e LdapSettings
+// using GtopPdqNet.Services;
+// using GtopPdqNet.Models; // Se LdapSettings estiver em Models
+
+namespace GtopPdqNet.Pages // Certifique-se que este namespace está correto
 {
-    // >>> ESTE ARQUIVO DEVE CONTER APENAS LoginModel <<<
     public class LoginModel : PageModel
     {
-        private readonly AuthService _authService;
+        private readonly AuthService _authService; // Certifique-se que AuthService está acessível (usando correto)
         private readonly ILogger<LoginModel> _logger;
+        private readonly LdapSettings _ldapSettings; // Para pegar o AllowedGroupCn
 
         [BindProperty]
         public InputModel Input { get; set; } = new InputModel();
@@ -38,10 +44,12 @@ namespace GtopPdqNet.Pages
             public string Password { get; set; } = string.Empty;
         }
 
-        public LoginModel(AuthService authService, ILogger<LoginModel> logger)
+        // Injete AuthService, ILogger e IOptions<LdapSettings>
+        public LoginModel(AuthService authService, ILogger<LoginModel> logger, IOptions<LdapSettings> ldapSettings)
         {
             _authService = authService;
             _logger = logger;
+            _ldapSettings = ldapSettings.Value ?? throw new ArgumentNullException(nameof(ldapSettings), "Configurações LDAP (LdapSettings) não podem ser nulas.");
         }
 
         public void OnGet(string? returnUrl = null)
@@ -61,44 +69,74 @@ namespace GtopPdqNet.Pages
 
             _logger.LogInformation("Login POST: Tentando autenticar usuário: {Username}", Input.Username);
 
-            // Chama o AuthService (assumindo que ele usa S.DS.P e verifica grupo)
-            var (isAuthenticated, userPrincipal, userGroups, authErrorMessage) = await _authService.AuthenticateUser(Input.Username, Input.Password);
+            var (isAuthenticated, userPrincipal, userGroups, authErrorMessage) = 
+                await _authService.AuthenticateUser(Input.Username, Input.Password);
 
-            if (isAuthenticated && userPrincipal != null)
+            if (isAuthenticated && userPrincipal != null && userGroups != null)
             {
-                _logger.LogInformation("Login POST: Autenticado: {Username}, Principal: {UserPrincipal}", Input.Username, userPrincipal);
+                _logger.LogInformation("Login POST: Usuário {UserPrincipal} autenticado com sucesso. Grupos encontrados: {UserGroupsCount}", userPrincipal, userGroups.Count);
+
+                // >>> INÍCIO DA VALIDAÇÃO DE GRUPO <<<
+                if (!string.IsNullOrWhiteSpace(_ldapSettings.AllowedGroupCn))
+                {
+                    _logger.LogInformation("Verificando pertença ao grupo obrigatório: '{AllowedGroupCn}'", _ldapSettings.AllowedGroupCn);
+                    if (!userGroups.Contains(_ldapSettings.AllowedGroupCn, StringComparer.OrdinalIgnoreCase))
+                    {
+                        _logger.LogWarning("Usuário {UserPrincipal} autenticado, mas NÃO pertence ao grupo permitido '{AllowedGroupCn}'. Acesso negado.", 
+                                         userPrincipal, _ldapSettings.AllowedGroupCn);
+                        ErrorMessage = $"Usuário autenticado, mas não tem permissão para acessar esta aplicação (não pertence ao grupo '{_ldapSettings.AllowedGroupCn}').";
+                        // Opcional: Deslogar explicitamente se um cookie parcial foi criado, embora não deva ser o caso aqui.
+                        // await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                        return Page();
+                    }
+                    _logger.LogInformation("Usuário {UserPrincipal} PERTENCE ao grupo permitido '{AllowedGroupCn}'.", userPrincipal, _ldapSettings.AllowedGroupCn);
+                }
+                else
+                {
+                    _logger.LogInformation("Nenhum grupo específico (AllowedGroupCn) configurado em appsettings.json. Permitindo acesso para qualquer usuário autenticado via LDAP.");
+                }
+                // >>> FIM DA VALIDAÇÃO DE GRUPO <<<
 
                 var claims = new List<Claim>
                 {
-                    new Claim(ClaimTypes.NameIdentifier, userPrincipal),
-                    new Claim(ClaimTypes.Name, userPrincipal),
+                    new Claim(ClaimTypes.NameIdentifier, userPrincipal), // Usar NameIdentifier para ID único
+                    new Claim(ClaimTypes.Name, userPrincipal), // Usar Name para nome de exibição/login
+                    // Adicionar outras claims se necessário, como email, nome completo, etc., se retornadas pelo LDAP
                 };
-                if (userGroups != null)
+
+                // Adicionar cada grupo do LDAP como uma claim de Papel (Role)
+                _logger.LogInformation("Adicionando {GroupCount} claims de papel (role) para o usuário {UserPrincipal}...", userGroups.Count, userPrincipal);
+                foreach (var groupName in userGroups)
                 {
-                    _logger.LogInformation("Login POST: Adicionando {GroupCount} claims de role...", userGroups.Count);
-                    foreach (var group in userGroups) {
-                        claims.Add(new Claim(ClaimTypes.Role, group));
-                        _logger.LogDebug(" - Role Claim Adicionada: {RoleName}", group);
-                    }
+                    claims.Add(new Claim(ClaimTypes.Role, groupName));
+                    _logger.LogDebug(" - Claim de Papel Adicionada: {GroupName}", groupName);
                 }
 
-                var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-                var claimsPrincipal = new ClaimsPrincipal(claimsIdentity);
+                var claimsIdentity = new ClaimsIdentity(
+                    claims, CookieAuthenticationDefaults.AuthenticationScheme);
 
-                var authProperties = new AuthenticationProperties { IsPersistent = true };
+                var authProperties = new AuthenticationProperties
+                {
+                    AllowRefresh = true, 
+                    IsPersistent = false, // Mude para true se quiser "Lembrar-me"
+                    // ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(60) // Definido globalmente nas opções do cookie
+                };
 
-                await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, claimsPrincipal, authProperties);
+                await HttpContext.SignInAsync(
+                    CookieAuthenticationDefaults.AuthenticationScheme,
+                    new ClaimsPrincipal(claimsIdentity),
+                    authProperties);
 
-                _logger.LogInformation("Login POST: Cookie criado para {Username}. Redirecionando para {ReturnUrl}", Input.Username, ReturnUrl);
+                _logger.LogInformation("Login POST: Cookie de autenticação criado para {UserPrincipal}. Redirecionando para {ReturnUrl}", userPrincipal, ReturnUrl);
                 return LocalRedirect(ReturnUrl);
             }
             else
             {
-                _logger.LogWarning("Login POST: Falha na autenticação/autorização para {Username}. Motivo: {Reason}", Input.Username, authErrorMessage ?? "Não especificado");
-                ModelState.AddModelError(string.Empty, authErrorMessage ?? "Tentativa de login inválida ou sem permissão.");
-                ErrorMessage = authErrorMessage ?? "Tentativa de login inválida ou sem permissão.";
+                _logger.LogWarning("Login POST: Falha na autenticação para o usuário {Username}. Erro: {AuthErrorMessage}", Input.Username, authErrorMessage);
+                ErrorMessage = authErrorMessage ?? "Usuário ou senha inválidos, ou falha ao obter informações do usuário.";
                 return Page();
             }
         }
-    } // Fim LoginModel
-} // Fim namespace
+    } 
+}
+

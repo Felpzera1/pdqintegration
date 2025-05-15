@@ -1,3 +1,4 @@
+// Seu Program.cs com TODAS as correções consolidadas
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,21 +13,25 @@ using System.Net.Sockets;
 using System.Text; 
 using System.Threading.Tasks; 
 using Microsoft.AspNetCore.Builder;
-using System.DirectoryServices.Protocols;
+using System.DirectoryServices.Protocols; // Usado para LDAP
+using System.Security.Claims; 
 using System.Security.Cryptography.X509Certificates;
 using Microsoft.AspNetCore.DataProtection;
 using System.IO;
+using Microsoft.AspNetCore.Http;
+
+// --- LdapSettings --- 
 public class LdapSettings
 {
     public string Server { get; set; } = string.Empty;
     public int Port { get; set; } = 389;
-    public bool UseSsl { get; set; } // Controla LDAPS ou StartTLS implícito
-    public string SearchBase { get; set; } = string.Empty;
-    public string SearchFilter { get; set; } = string.Empty;
-    public string AllowedGroupCn { get; set; } = string.Empty;
+    public bool UseSsl { get; set; } 
+    public string SearchBase { get; set; } = string.Empty; 
+    public string SearchFilter { get; set; } = string.Empty; 
+    public string AllowedGroupCn { get; set; } = string.Empty; 
 }
 
-// Serviço de Autenticação LDAP
+// --- AuthService --- 
 public class AuthService
 {
     private readonly ILogger<AuthService> _logger;
@@ -36,6 +41,13 @@ public class AuthService
     {
         _logger = logger;
         _ldapSettings = ldapSettings.Value ?? throw new ArgumentNullException(nameof(ldapSettings), "Configurações LDAP (LdapSettings) não podem ser nulas.");
+        if (string.IsNullOrWhiteSpace(_ldapSettings.Server) || 
+            string.IsNullOrWhiteSpace(_ldapSettings.SearchBase) || 
+            string.IsNullOrWhiteSpace(_ldapSettings.SearchFilter))
+        {
+            _logger.LogError("Configurações LDAP essenciais (Server, SearchBase, SearchFilter) estão faltando.");
+            throw new InvalidOperationException("Configurações LDAP essenciais (Server, SearchBase, SearchFilter) não foram fornecidas no appsettings.json.");
+        }
     }
 
     public async Task<(bool IsAuthenticated, string? UserPrincipalName, List<string>? UserGroups, string? ErrorMessage)> AuthenticateUser(string username, string password)
@@ -45,82 +57,196 @@ public class AuthService
             _logger.LogWarning("Tentativa de autenticação com usuário ou senha em branco.");
             return (false, null, null, "Usuário ou senha não podem estar em branco.");
         }
-        return await Task.Run(() => AuthenticateWithSDSP(username, password));
+        return await Task.Run(() => AuthenticateAndGetGroups(username, password));
     }
 
-    private (bool IsAuthenticated, string? UserPrincipalName, List<string>? UserGroups, string? ErrorMessage) AuthenticateWithSDSP(string username, string password)
+    private (bool IsAuthenticated, string? UserPrincipalName, List<string>? UserGroups, string? ErrorMessage) AuthenticateAndGetGroups(string username, string password)
     {
-        _logger.LogInformation($"--- Iniciando Autenticação S.DS.P com Validação de Certificado ---");
-        _logger.LogInformation($"Servidor: {_ldapSettings.Server}:{_ldapSettings.Port}, UseSsl: {_ldapSettings.UseSsl}");
+        _logger.LogInformation($"--- Iniciando Autenticação e Busca de Grupos S.DS.P ---");
+        _logger.LogInformation($"Servidor: {_ldapSettings.Server}:{_ldapSettings.Port}, UseSsl: {_ldapSettings.UseSsl}, SearchBase: {_ldapSettings.SearchBase}");
 
+        LdapConnection? connection = null;
         try
         {
             var ldapIdentifier = new LdapDirectoryIdentifier(_ldapSettings.Server, _ldapSettings.Port);
-            using var connection = new LdapConnection(ldapIdentifier);
-
+            connection = new LdapConnection(ldapIdentifier);
             connection.SessionOptions.ProtocolVersion = 3;
-            connection.AuthType = AuthType.Basic;
 
             if (_ldapSettings.UseSsl)
             {
+                _logger.LogInformation("Tentando conexão LDAPS (SecureSocketLayer = true).");
                 connection.SessionOptions.SecureSocketLayer = true;
             }
 
             var credential = new NetworkCredential(username, password);
+            _logger.LogInformation($"Tentando Bind com usuário: {username}");
             connection.Bind(credential);
+            _logger.LogInformation("Autenticação (Bind) bem-sucedida para: {username}", username);
 
-            _logger.LogInformation("Autenticação bem-sucedida.");
-            return (true, username, new List<string>(), null);
+            // >>> INÍCIO DA BUSCA DE GRUPOS (LÓGICA DO FILTRO CORRIGIDA) <<<
+            string userIdentifierForFilter;
+            if (_ldapSettings.SearchFilter.ToLower().Contains("samaccountname") && username.Contains("@"))
+            {
+                userIdentifierForFilter = username.Split("@")[0];
+                _logger.LogInformation($"SearchFilter parece ser para sAMAccountName, usando 	userIdentifierForFilter do username 	username.");
+            }
+            else
+            {
+                userIdentifierForFilter = username; 
+                _logger.LogInformation($"Usando identificador completo 	userIdentifierForFilter para o filtro LDAP.");
+            }
+            string userFilter = string.Format(_ldapSettings.SearchFilter, userIdentifierForFilter);
+            _logger.LogInformation($"Buscando usuário com filtro: {userFilter} em SearchBase: {_ldapSettings.SearchBase}");
+
+            var searchRequest = new SearchRequest(
+                _ldapSettings.SearchBase, 
+                userFilter,             
+                SearchScope.Subtree,    
+                new string[] { "memberOf", "distinguishedName", "userPrincipalName" } 
+            );
+
+            SearchResponse? searchResponse = connection.SendRequest(searchRequest) as SearchResponse;
+            if (searchResponse == null || searchResponse.Entries.Count == 0)
+            {
+                _logger.LogWarning($"Usuário {username} autenticado, mas não encontrado na busca LDAP com filtro {userFilter} para obter grupos.");
+                return (true, username, new List<string>(), "Usuário autenticado, mas detalhes não puderam ser recuperados do diretório.");
+            }
+
+            SearchResultEntry userEntry = searchResponse.Entries[0];
+            string? userPrincipalNameFromSearch = username; 
+            if (userEntry.Attributes.Contains("userPrincipalName"))
+            {
+                userPrincipalNameFromSearch = userEntry.Attributes["userPrincipalName"][0] as string ?? username;
+            }
+
+            // >>> LÓGICA DE PROCESSAMENTO DO MEMBEROF CORRIGIDA <<<
+            var groups = new List<string>();
+            if (userEntry.Attributes.Contains("memberOf"))
+            {
+                _logger.LogInformation($"Atributo 'memberOf' encontrado. Processando {userEntry.Attributes["memberOf"].Count} entradas.");
+                foreach (object value in userEntry.Attributes["memberOf"]) 
+                {
+                    string groupDn;
+                    if (value is byte[] bytesValue)
+                    {
+                        groupDn = System.Text.Encoding.UTF8.GetString(bytesValue);
+                        _logger.LogInformation($"Valor 'memberOf' era byte[], convertido para string: {groupDn}");
+                    }
+                    else if (value is string stringValue)
+                    {
+                        groupDn = stringValue;
+                    }
+                    else
+                    {
+                        _logger.LogWarning($"Valor 'memberOf' não é string nem byte[]: {value?.GetType().FullName}. Ignorando.");
+                        continue;
+                    }
+
+                    try
+                    {
+                        string[] dnParts = groupDn.Split(',');
+                        if (dnParts.Length > 0)
+                        {
+                            string[] cnPart = dnParts[0].Split('=');
+                            if (cnPart.Length > 1)
+                            {
+                                string cn = cnPart[1];
+                                groups.Add(cn);
+                                _logger.LogInformation($"Usuário {username} é membro do grupo (CN): {cn} (DN original: {groupDn})");
+                            }
+                            else
+                            {
+                                _logger.LogWarning($"Não foi possível extrair o CN do primeiro componente de: {groupDn} (não contém '=')");
+                            }
+                        }
+                        else
+                        {
+                             _logger.LogWarning($"DN do grupo está vazio ou inválido: {groupDn}");
+                        }
+                    }
+                    catch (Exception exCn)
+                    {
+                        _logger.LogWarning(exCn, $"Não foi possível processar/extrair o CN do DN do grupo: {groupDn}");
+                    }
+                }
+            }
+            else
+            {
+                _logger.LogInformation($"Usuário {username} não possui o atributo 'memberOf' ou não é membro de nenhum grupo listado.");
+            }
+            // >>> FIM DA BUSCA DE GRUPOS <<<
+
+            return (true, userPrincipalNameFromSearch, groups, null);
         }
         catch (LdapException ldapEx)
         {
             string detailedErrorMessage = ldapEx.ServerErrorMessage ?? ldapEx.Message;
-            return (false, null, null, $"Erro LDAP: {detailedErrorMessage}");
+            _logger.LogError(ldapEx, $"Erro LDAP durante autenticação/busca de grupos para {username}: {detailedErrorMessage}", username); 
+            return (false, null, null, $"Erro de autenticação ou comunicação com o servidor LDAP. Detalhe: {detailedErrorMessage}");
         }
         catch (Exception ex)
         {
-            return (false, null, null, $"Erro Geral: {ex.Message}");
+            _logger.LogError(ex, $"Erro Geral durante autenticação/busca de grupos para {username}: {ex.Message}", username); 
+            return (false, null, null, $"Ocorreu um erro inesperado durante a autenticação. Detalhe: {ex.Message}");
         }
         finally
         {
-            _logger.LogInformation("--- FINALIZANDO Autenticação S.DS.P ---");
+            connection?.Dispose(); 
+            _logger.LogInformation("--- FINALIZANDO Autenticação e Busca de Grupos S.DS.P ---");
         }
     }
 }
 
-// Configuração da Aplicação e Pipeline
+// --- Configuração da Aplicação e Pipeline (Program.Main) ---
 public class Program
 {
     public static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
 
-        // Configuração de Serviços
-        builder.Services.AddRazorPages();
+        builder.Services.AddRazorPages(
+            options =>
+            {
+                options.Conventions.AuthorizeFolder("/"); 
+                options.Conventions.AllowAnonymousToPage("/Login"); 
+                options.Conventions.AllowAnonymousToPage("/Error"); 
+                options.Conventions.AllowAnonymousToPage("/AccessDenied"); 
+            }
+        );
+
         builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
             .AddCookie(options =>
             {
-                options.LoginPath = "/Login";
-                options.LogoutPath = "/Logout";
-                options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
+                options.LoginPath = "/Login"; 
+                options.LogoutPath = "/Logout"; 
+                options.AccessDeniedPath = "/AccessDenied"; 
+                options.ExpireTimeSpan = TimeSpan.FromMinutes(60); 
                 options.SlidingExpiration = true;
                 options.Cookie.HttpOnly = true;
                 options.Cookie.IsEssential = true;
+                options.Cookie.SecurePolicy = CookieSecurePolicy.Always; 
             });
+        
         builder.Services.AddAuthorization();
+
         builder.Services.Configure<LdapSettings>(builder.Configuration.GetSection("LdapSettings"));
         builder.Services.AddScoped<AuthService>();
+        // Verifique se GtopPdqNet.Interfaces e GtopPdqNet.Services são os namespaces corretos para seu projeto
         builder.Services.AddScoped<GtopPdqNet.Interfaces.IPowerShellService, GtopPdqNet.Services.PowerShellService>();
+        
         builder.Logging.ClearProviders();
         builder.Logging.AddConsole();
         builder.Logging.AddDebug();
+
+        // Certifique-se que o caminho "C:\\projetopdq\\keys" existe e a aplicação tem permissão de escrita.
         builder.Services.AddDataProtection()
-        .PersistKeysToFileSystem(new DirectoryInfo("C:\\projetopdq\\keys")) 
-        .SetApplicationName("PdqWebApp"); // Ou outro nome único para sua app
+            .PersistKeysToFileSystem(new DirectoryInfo("C:\\projetopdq\\keys")) 
+            .SetApplicationName("PdqWebApp");
+
+        builder.Services.AddMemoryCache();
 
         var app = builder.Build();
 
-        // Configuração do Pipeline
         if (!app.Environment.IsDevelopment())
         {
             app.UseExceptionHandler("/Error");
@@ -128,15 +254,18 @@ public class Program
         }
         else
         {
-            app.UseDeveloperExceptionPage();
+            app.UseDeveloperExceptionPage(); 
         }
         app.UseHttpsRedirection();
         app.UseStaticFiles();
         app.UseRouting();
-        app.UseAuthentication();
-        app.UseAuthorization();
+        
+        app.UseAuthentication(); 
+        app.UseAuthorization();  
+        
         app.MapRazorPages();
 
         app.Run();
     }
 }
+
