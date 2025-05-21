@@ -1,4 +1,3 @@
-// Seu Program.cs com TODAS as correções consolidadas
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,14 +12,12 @@ using System.Net.Sockets;
 using System.Text; 
 using System.Threading.Tasks; 
 using Microsoft.AspNetCore.Builder;
-using System.DirectoryServices.Protocols; // Usado para LDAP
+using System.DirectoryServices.Protocols; 
 using System.Security.Claims; 
 using System.Security.Cryptography.X509Certificates;
 using Microsoft.AspNetCore.DataProtection;
 using System.IO;
-using Microsoft.AspNetCore.Http;
-
-// --- LdapSettings --- 
+using Microsoft.AspNetCore.Http; 
 public class LdapSettings
 {
     public string Server { get; set; } = string.Empty;
@@ -83,7 +80,7 @@ public class AuthService
             connection.Bind(credential);
             _logger.LogInformation("Autenticação (Bind) bem-sucedida para: {username}", username);
 
-            // >>> INÍCIO DA BUSCA DE GRUPOS (LÓGICA DO FILTRO CORRIGIDA) <<<
+            
             string userIdentifierForFilter;
             if (_ldapSettings.SearchFilter.ToLower().Contains("samaccountname") && username.Contains("@"))
             {
@@ -119,7 +116,7 @@ public class AuthService
                 userPrincipalNameFromSearch = userEntry.Attributes["userPrincipalName"][0] as string ?? username;
             }
 
-            // >>> LÓGICA DE PROCESSAMENTO DO MEMBEROF CORRIGIDA <<<
+            
             var groups = new List<string>();
             if (userEntry.Attributes.Contains("memberOf"))
             {
@@ -174,7 +171,7 @@ public class AuthService
             {
                 _logger.LogInformation($"Usuário {username} não possui o atributo 'memberOf' ou não é membro de nenhum grupo listado.");
             }
-            // >>> FIM DA BUSCA DE GRUPOS <<<
+        
 
             return (true, userPrincipalNameFromSearch, groups, null);
         }
@@ -197,7 +194,7 @@ public class AuthService
     }
 }
 
-// --- Configuração da Aplicação e Pipeline (Program.Main) ---
+
 public class Program
 {
     public static void Main(string[] args)
@@ -231,14 +228,14 @@ public class Program
 
         builder.Services.Configure<LdapSettings>(builder.Configuration.GetSection("LdapSettings"));
         builder.Services.AddScoped<AuthService>();
-        // Verifique se GtopPdqNet.Interfaces e GtopPdqNet.Services são os namespaces corretos para seu projeto
+        
         builder.Services.AddScoped<GtopPdqNet.Interfaces.IPowerShellService, GtopPdqNet.Services.PowerShellService>();
         
         builder.Logging.ClearProviders();
         builder.Logging.AddConsole();
         builder.Logging.AddDebug();
 
-        // Certifique-se que o caminho "C:\\projetopdq\\keys" existe e a aplicação tem permissão de escrita.
+        
         builder.Services.AddDataProtection()
             .PersistKeysToFileSystem(new DirectoryInfo("C:\\projetopdq\\keys")) 
             .SetApplicationName("PdqWebApp");

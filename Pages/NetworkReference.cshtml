@@ -1,0 +1,273 @@
+@page
+@model NetworkReferenceModel
+@{
+ViewData["Title"] = "Referência de Rede";
+}
+<div class="container mt-4">
+   <div class="row">
+      <div class="col-md-12">
+         <h2>Referência de Rede</h2>
+         <hr />
+      </div>
+   </div>
+   <div class="row mb-4">
+      <div class="col-md-6">
+         <div class="card">
+            <div class="card-header">
+               <h4>Conversor de Loja para Octeto</h4>
+            </div>
+            <div class="card-body">
+               <div class="mb-3">
+                  <label for="storeNumber" class="form-label">Número da Loja:</label>
+                  <div class="input-group">
+                     <input type="number" class="form-control" id="storeNumber" placeholder="Ex: 718">
+                     <button class="btn btn-primary" type="button" id="convertButton">Converter</button>
+                  </div>
+               </div>
+               <div id="conversionResult" class="alert alert-success d-none">
+                  <p class="mb-0">Loja <span id="resultStoreNumber"></span>: Terceiro octeto = <strong><span id="resultOctet"></span></strong></p>
+                  <p class="mb-0">IP: <code>192.168.<span id="resultOctetExample"></span>.xxx</code></p>
+               </div>
+            </div>
+         </div>
+      </div>
+   </div>
+   <div class="row">
+      <div class="col-md-12">
+         <div class="card">
+            <div class="card-header">
+               <h4>Faixas de IP e Funções</h4>
+               <div id="ipRangeNotice" class="alert alert-info d-none mt-2 mb-0">
+                  <p class="mb-0">Mostrando faixas de IP para a loja <strong><span id="selectedStore"></span></strong> (Octeto: <strong><span id="selectedOctet"></span></strong>)</p>
+               </div>
+            </div>
+            <div class="card-body">
+               <div class="table-responsive">
+                  <table class="table table-striped table-sm">
+                     <thead>
+                        <tr>
+                           <th>Faixa de IP</th>
+                           <th>Função</th>
+                        </tr>
+                     </thead>
+                     <tbody id="ipRangeTable">
+                        <tr>
+                           <td class="ip-range">192.168.XXX.000 - 100</td>
+                           <td>Faixa de DHCP, computadores administrativo</td>
+                        </tr>
+                        <tr>
+                           <td class="ip-range">192.168.XXX.101 - 120</td>
+                           <td>Caixas</td>
+                        </tr>
+                        <tr>
+                           <td class="ip-range">192.168.XXX.121 - 125</td>
+                           <td>Relógio ponto</td>
+                        </tr>
+                        <tr>
+                           <td class="ip-range">192.168.XXX.126 - 130</td>
+                           <td>Cofre Prosegur</td>
+                        </tr>
+                        <tr>
+                           <td class="ip-range">192.168.XXX.131 - 140</td>
+                           <td>Balanças</td>
+                        </tr>
+                        <tr>
+                           <td class="ip-range">192.168.XXX.141 - 160</td>
+                           <td>Busca preço</td>
+                        </tr>
+                        <tr>
+                           <td class="ip-range">192.168.XXX.161 - 170</td>
+                           <td>Telefones IP</td>
+                        </tr>
+                        <tr>
+                           <td class="ip-range">192.168.XXX.171 - 180</td>
+                           <td>Impressoras</td>
+                        </tr>
+                        <tr>
+                           <td class="ip-range">192.168.XXX.181 - 182</td>
+                           <td>TVs Preço</td>
+                        </tr>
+                        <tr>
+                           <td class="ip-range">192.168.XXX.183 - 190</td>
+                           <td>Livre</td>
+                        </tr>
+                        <tr>
+                           <td class="ip-range">192.168.XXX.191 - 200</td>
+                           <td>Câmeras IP</td>
+                        </tr>
+                        <tr>
+                           <td class="ip-range">192.168.XXX.201 - 210</td>
+                           <td>Antenas WiFi</td>
+                        </tr>
+                        <tr>
+                           <td class="ip-range">192.168.XXX.211 - 220</td>
+                           <td>DVR</td>
+                        </tr>
+                        <tr>
+                           <td class="ip-range">192.168.XXX.221 - 230</td>
+                           <td>Switch</td>
+                        </tr>
+                        <tr>
+                           <td class="ip-range">192.168.XXX.234</td>
+                           <td>Servidor UN</td>
+                        </tr>
+                        <tr>
+                           <td class="ip-range">192.168.XXX.235</td>
+                           <td>Servidor AD</td>
+                        </tr>
+                        <tr>
+                           <td class="ip-range">192.168.XXX.236</td>
+                           <td>Radio</td>
+                        </tr>
+                        <tr>
+                           <td class="ip-range">192.168.XXX.250</td>
+                           <td>VMware, ProxMox (virtualizador)</td>
+                        </tr>
+                        <tr>
+                           <td class="ip-range">192.168.XXX.254</td>
+                           <td>SonicWall</td>
+                        </tr>
+                        <tr class="special-range">
+                           <td>172.16.1.XXX</td>
+                           <td>Interconexão</td>
+                        </tr>
+                        <tr class="special-range">
+                           <td>10.1.XXX.0 - 250</td>
+                           <td>Vlan - GTOP/Free Wi-Fi</td>
+                        </tr>
+                     </tbody>
+                  </table>
+               </div>
+            </div>
+         </div>
+      </div>
+   </div>
+</div>
+@section Scripts {
+<script>
+   document.addEventListener('DOMContentLoaded', function() {
+       const storeNumberInput = document.getElementById('storeNumber');
+       const convertButton = document.getElementById('convertButton');
+       const conversionResult = document.getElementById('conversionResult');
+       const resultStoreNumber = document.getElementById('resultStoreNumber');
+       const resultOctet = document.getElementById('resultOctet');
+       const resultOctetExample = document.getElementById('resultOctetExample');
+       const ipRangeTable = document.getElementById('ipRangeTable');
+       const ipRangeNotice = document.getElementById('ipRangeNotice');
+       const selectedStore = document.getElementById('selectedStore');
+       const selectedOctet = document.getElementById('selectedOctet');
+       
+       // Armazenar o texto original das faixas de IP
+       const originalIpRanges = [];
+       const ipRangeElements = document.querySelectorAll('.ip-range');
+       ipRangeElements.forEach(element => {
+           originalIpRanges.push(element.textContent);
+       });
+       
+       // Mapeamento de lojas para terceiro octeto
+       const storeToOctetMap = {
+           '718': '181',
+           '007': '182'
+           // Adicione mais mapeamentos conforme necessário
+       };
+       
+       // Função para converter número da loja para terceiro octeto
+       function convertStoreToOctet(storeNumber) {
+           // Se o número da loja estiver no mapeamento, use o valor mapeado
+           if (storeToOctetMap[storeNumber]) {
+               return storeToOctetMap[storeNumber];
+           }
+           
+           // Caso contrário, use uma lógica de conversão padrão
+           // Esta é uma lógica de exemplo - ajuste conforme necessário
+           const storeNum = parseInt(storeNumber, 10);
+           
+           // Validação básica
+           if (isNaN(storeNum) || storeNum <= 0) {
+               return null;
+           }
+           
+           // Lógica de conversão (exemplo)
+           // Aqui você pode implementar a lógica real de conversão da sua empresa
+           let octet;
+           if (storeNum < 100) {
+               octet = 100 + storeNum;
+           } else if (storeNum < 1000) {
+               octet = Math.floor(storeNum / 5) + 100;
+           } else {
+               return null;
+           }
+           
+           // Garantir que o octeto esteja no intervalo válido (1-254)
+           if (octet < 1 || octet > 254) {
+               return null;
+           }
+           
+           return octet.toString();
+       }
+       
+       // Função para atualizar as faixas de IP com o octeto da loja
+       function updateIpRanges(octet) {
+           ipRangeElements.forEach((element, index) => {
+               // Substituir XXX pelo octeto
+               element.textContent = originalIpRanges[index].replace('XXX', octet);
+           });
+           
+           // Mostrar aviso de qual loja está sendo exibida
+           ipRangeNotice.classList.remove('d-none');
+       }
+       
+       // Função para restaurar as faixas de IP originais
+       function resetIpRanges() {
+           ipRangeElements.forEach((element, index) => {
+               element.textContent = originalIpRanges[index];
+           });
+           
+           // Esconder aviso
+           ipRangeNotice.classList.add('d-none');
+       }
+       
+       // Evento de clique no botão de conversão
+       convertButton.addEventListener('click', function() {
+           const storeNumber = storeNumberInput.value.trim();
+           
+           // Esconder resultados anteriores
+           conversionResult.classList.add('d-none');
+           
+           // Restaurar faixas de IP originais
+           resetIpRanges();
+           
+           if (!storeNumber) {
+               alert('Por favor, digite um número de loja.');
+               return;
+           }
+           
+           const octet = convertStoreToOctet(storeNumber);
+           if (octet) {
+               // Atualizar resultado da conversão
+               resultStoreNumber.textContent = storeNumber;
+               resultOctet.textContent = octet;
+               resultOctetExample.textContent = octet;
+               conversionResult.classList.remove('d-none');
+               
+               // Atualizar faixas de IP na tabela
+               updateIpRanges(octet);
+               
+               // Atualizar aviso de loja selecionada
+               selectedStore.textContent = storeNumber;
+               selectedOctet.textContent = octet;
+           } else {
+               alert('Não foi possível converter este número de loja. Verifique se o número é válido.');
+           }
+       });
+       
+       // Permitir pressionar Enter para converter
+       storeNumberInput.addEventListener('keypress', function(event) {
+           if (event.key === 'Enter') {
+               event.preventDefault();
+               convertButton.click();
+           }
+       });
+   });
+</script>
+}

@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("GtopPdqNet")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b5b995bdd74e1a69f50bfe66ac2074647e1caf7a")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+398a84ee9487055f60e2a80ff6d768b07590e8ff")]
 [assembly: System.Reflection.AssemblyProductAttribute("GtopPdqNet")]
 [assembly: System.Reflection.AssemblyTitleAttribute("GtopPdqNet")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

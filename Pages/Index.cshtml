@@ -25,7 +25,7 @@
     <div>
         @* >>> ADICIONAR BOTÃO DE ATUALIZAR PACOTES <<< *@
         <form method="post" asp-page-handler="RefreshPackages" style="display: inline-block; margin-right: 10px;">
-            <button type="submit" class="btn btn-sm btn-outline-secondary">Atualizar Lista de Pacotes</button>
+            <button type="submit" class="btn btn-sm btn-outline-secondary">Atualizar Pacotes</button>
         </form>
 
         @* Botão de Logout (verifique se o caminho está correto para sua app Identity) *@
@@ -35,7 +35,7 @@
     </div>
 </div>
 
-<<div class="row mt-4 g-3">
+<div class="row mt-4 g-3">
     <div class="col-lg-5">
         <div class="dark-content-box h-100">
             <div class="mb-4 text-center"> 
@@ -50,7 +50,9 @@
             <form id="deployForm" method="post">
                 <div class="mb-3">
                     <label asp-for="Hostname" class="form-label"></label>
-                    <input asp-for="Hostname" id="hostnameInput" class="form-control" placeholder="Ex.: Hostname ou IP" />
+                    <input asp-for="Hostname" id="hostnameInput" class="form-control" 
+                           placeholder="Ex.: CN001; TOP002; PDV003 (máx. 5 computadores)" />
+                    <small class="form-text text-muted">Separe múltiplos computadores com ponto e vírgula (;). Apenas computadores com prefixos CN, TOP ou PDV são permitidos.</small>
                     <span asp-validation-for="Hostname" class="text-danger"></span>
                 </div>
                 <div class="mb-3">
@@ -98,7 +100,6 @@
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
     <script>
-        // Seu JavaScript original permanece aqui, sem alterações necessárias para o botão de refresh
         document.addEventListener('DOMContentLoaded', function () {
             const deployButton = document.getElementById('deployButton');
             const deployButtonText = document.getElementById('deployButtonText');
@@ -110,28 +111,139 @@
             const antiForgeryToken = document.querySelector('input[name="__RequestVerificationToken"]').value;
 
             deployButton.addEventListener('click', function () {
-                const hostname = hostnameInput.value.trim();
+                // Obter e validar a entrada
+                const hostnamesInput = hostnameInput.value.trim();
                 const selectedPackage = packageSelect.value;
-                if (!hostname || !selectedPackage) { alert('Hostname e Pacote são obrigatórios.'); return; }
-
-                logOutput.textContent = `[${_getCurrentTime()}] Iniciando para '${hostname}' com pacote '${selectedPackage}'...\n---------------------------------------\n`;
-                logContainer.style.borderColor = '#444'; _scrollToBottom(logContainer);
-                deployButton.disabled = true; spinner.style.display = 'inline-block'; deployButtonText.textContent = 'Executando...';
-
-                const formData = new FormData(); formData.append('hostname', hostname); formData.append('selectedPackage', selectedPackage);
-
-                 fetch('/Index?handler=Deploy', { method: 'POST', headers: { 'RequestVerificationToken': antiForgeryToken }, body: formData })
-                 .then(response => {
-                    if (!response.ok) { return response.text().then(text => { throw new Error(`Erro Servidor ${response.status}: ${text || 'Detalhe não disponível.'}`); }); }
-                     return response.json();
-                 })
-                 .then(data => { _displayLog(data.log || '[Sem log]', data.success); _scrollToBottom(logContainer); })
-                 .catch(error => { console.error('Erro deploy:', error); _displayLog(`ERRO Comunicação:\n${error.message}`, false); _scrollToBottom(logContainer); })
-                 .finally(() => { deployButton.disabled = false; spinner.style.display = 'none'; deployButtonText.textContent = 'Realizar Deploy'; });
+                
+                if (!hostnamesInput || !selectedPackage) { 
+                    alert('Hostname e Pacote são obrigatórios.'); 
+                    return; 
+                }
+                
+                // Dividir a entrada em múltiplos hostnames
+                const hostnames = hostnamesInput.split(';')
+                    .map(h => h.trim())
+                    .filter(h => h.length > 0);
+                    
+                // Validar o número máximo de computadores
+                if (hostnames.length > 5) {
+                    alert('Máximo de 5 computadores permitidos por vez.');
+                    return;
+                }
+                
+                // Validar os prefixos dos computadores
+                const invalidHostnames = hostnames.filter(h => !h.toUpperCase().startsWith('CN') && 
+                                                              !h.toUpperCase().startsWith('TOP') && 
+                                                              !h.toUpperCase().startsWith('PDV'));
+                if (invalidHostnames.length > 0) {
+                    alert(`Os seguintes computadores não têm prefixos válidos (CN, TOP, PDV): ${invalidHostnames.join(', ')}`);
+                    return;
+                }
+                
+                // Iniciar o processo de deploy
+                logOutput.textContent = `[${_getCurrentTime()}] Iniciando deploy para ${hostnames.length} computador(es) com pacote '${selectedPackage}'...\n`;
+                logOutput.textContent += `Computadores: ${hostnames.join(', ')}\n`;
+                logOutput.textContent += `---------------------------------------\n`;
+                
+                logContainer.style.borderColor = '#444';
+                _scrollToBottom(logContainer);
+                deployButton.disabled = true;
+                spinner.style.display = 'inline-block';
+                deployButtonText.textContent = 'Executando...';
+                
+                // Processar cada hostname sequencialmente
+                processHostnames(hostnames, selectedPackage, 0, []);
             });
-            function _displayLog(logText, success) { logOutput.textContent += `\n[${_getCurrentTime()}] Resposta Servidor:\n---------------------------------------\n${logText}\n=======================================\n`; logContainer.style.borderColor = success ? '#198754' : '#dc3545'; }
-            function _scrollToBottom(element) { element.scrollTop = element.scrollHeight; }
-            function _getCurrentTime() { return new Date().toLocaleTimeString('pt-BR'); }
+            
+            // Função para processar os hostnames sequencialmente
+            function processHostnames(hostnames, selectedPackage, index, results) {
+                if (index >= hostnames.length) {
+                    // Todos os hostnames foram processados
+                    const successCount = results.filter(r => r.success).length;
+                    const failCount = results.length - successCount;
+                    
+                    logOutput.textContent += `\n[${_getCurrentTime()}] Processo concluído!\n`;
+                    logOutput.textContent += `---------------------------------------\n`;
+                    logOutput.textContent += `Total: ${results.length} | Sucesso: ${successCount} | Falha: ${failCount}\n`;
+                    logOutput.textContent += `=======================================\n`;
+                    
+                    deployButton.disabled = false;
+                    spinner.style.display = 'none';
+                    deployButtonText.textContent = 'Realizar Deploy';
+                    
+                    // Definir a cor da borda com base no resultado geral
+                    logContainer.style.borderColor = failCount === 0 ? '#198754' : (successCount === 0 ? '#dc3545' : '#ffc107');
+                    
+                    return;
+                }
+                
+                const hostname = hostnames[index];
+                logOutput.textContent += `\n[${_getCurrentTime()}] Processando ${index + 1}/${hostnames.length}: '${hostname}'\n`;
+                _scrollToBottom(logContainer);
+                
+                const formData = new FormData();
+                formData.append('hostname', hostname);
+                formData.append('selectedPackage', selectedPackage);
+                
+                fetch('/Index?handler=Deploy', {
+                    method: 'POST',
+                    headers: {
+                        'RequestVerificationToken': antiForgeryToken
+                    },
+                    body: formData
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.text().then(text => {
+                            throw new Error(`Erro Servidor ${response.status}: ${text || 'Detalhe não disponível.'}`);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    results.push({
+                        hostname: hostname,
+                        success: data.success,
+                        log: data.log || '[Sem log]'
+                    });
+                    
+                    _displayLog(`COMPUTADOR: ${hostname}\n${data.log || '[Sem log]'}`, data.success);
+                    _scrollToBottom(logContainer);
+                    
+                    // Processar o próximo hostname
+                    processHostnames(hostnames, selectedPackage, index + 1, results);
+                })
+                .catch(error => {
+                    console.error('Erro deploy:', error);
+                    
+                    results.push({
+                        hostname: hostname,
+                        success: false,
+                        log: `ERRO Comunicação:\n${error.message}`
+                    });
+                    
+                    _displayLog(`COMPUTADOR: ${hostname}\nERRO Comunicação:\n${error.message}`, false);
+                    _scrollToBottom(logContainer);
+                    
+                    // Processar o próximo hostname mesmo em caso de erro
+                    processHostnames(hostnames, selectedPackage, index + 1, results);
+                });
+            }
+            
+            function _displayLog(logText, success) {
+                logOutput.textContent += `\n[${_getCurrentTime()}] Resposta Servidor:\n`;
+                logOutput.textContent += `---------------------------------------\n`;
+                logOutput.textContent += `${logText}\n`;
+                logOutput.textContent += `---------------------------------------\n`;
+            }
+            
+            function _scrollToBottom(element) {
+                element.scrollTop = element.scrollHeight;
+            }
+            
+            function _getCurrentTime() {
+                return new Date().toLocaleTimeString('pt-BR');
+            }
         });
     </script>
 }

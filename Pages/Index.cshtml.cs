@@ -1,4 +1,3 @@
-// Arquivo: Pages/Index.cshtml.cs
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -24,6 +23,8 @@ namespace GtopPdqNet.Pages
         [BindProperty]
         [Required(ErrorMessage = "O Hostname é obrigatório.")]
         [Display(Name = "Hostname ou IP")]
+        [RegularExpression(@"^(CN|TOP|PDV)[^;]*(;(CN|TOP|PDV)[^;]*){0,4}$", 
+            ErrorMessage = "Formato inválido. Use até 5 computadores com prefixos CN, TOP ou PDV, separados por ponto e vírgula (;).")]
         public string Hostname { get; set; } = string.Empty;
 
         [BindProperty]
@@ -71,12 +72,19 @@ namespace GtopPdqNet.Pages
 
         public async Task<JsonResult> OnPostDeployAsync(string hostname, string selectedPackage)
         {
-            // ... (seu código OnPostDeployAsync original permanece aqui, sem alterações)
             _logger.LogInformation("IndexModel.OnPostDeployAsync: Host={Hostname}, Pacote={Package}", hostname, selectedPackage);
 
             if (string.IsNullOrWhiteSpace(hostname) || string.IsNullOrWhiteSpace(selectedPackage)) {
                  _logger.LogWarning("IndexModel.OnPostDeployAsync: Parâmetros inválidos.");
                  return new JsonResult(new { success = false, log = "ERRO: Hostname e Pacote são obrigatórios." });
+            }
+
+            // Validar o prefixo do hostname
+            if (!hostname.ToUpper().StartsWith("CN") && 
+                !hostname.ToUpper().StartsWith("TOP") && 
+                !hostname.ToUpper().StartsWith("PDV")) {
+                _logger.LogWarning("IndexModel.OnPostDeployAsync: Prefixo de hostname inválido: {Hostname}", hostname);
+                return new JsonResult(new { success = false, log = $"ERRO: O hostname '{hostname}' não tem um prefixo válido (CN, TOP, PDV)." });
             }
 
             var logBuilder = new StringBuilder();
